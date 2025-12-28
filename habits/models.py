@@ -1,5 +1,7 @@
-from django.conf import settings
 from django.db import models
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 
 
 class Habit(models.Model):
@@ -22,13 +24,14 @@ class Habit(models.Model):
         verbose_name="Связанная привычка",
     )
     frequency = models.PositiveIntegerField(
-        default=1, verbose_name="Периодичность (в днях)"
+        default=1, verbose_name="Периодичность (в днях)", help_text="Дни (максимум 7)"
     )
     reward = models.CharField(
         max_length=255, blank=True, null=True, verbose_name="Вознаграждение"
     )
     duration = models.PositiveIntegerField(
-        verbose_name="Время на выполнение (в секундах)"
+        verbose_name="Время на выполнение (в секундах)",
+        help_text="Секунды (максимум 120)",
     )
     is_public = models.BooleanField(default=False, verbose_name="Признак публичности")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
@@ -37,6 +40,46 @@ class Habit(models.Model):
     class Meta:
         verbose_name = "Привычка"
         verbose_name_plural = "Привычки"
+        ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.action} в {self.time}"
+        return f"{self.action} в {self.time} ({self.user.username})"
+
+    def clean(self):
+        """Валидация данных модели"""
+        from .validators import (
+            DurationValidator,
+            FrequencyValidator,
+            PleasantHabitValidator,
+            RelatedHabitIsPleasantValidator,
+            RelatedHabitRewardValidator,
+        )
+
+        attrs = {
+            "duration": self.duration,
+            "frequency": self.frequency,
+            "is_pleasant": self.is_pleasant,
+            "reward": self.reward,
+            "related_habit": self.related_habit,
+        }
+
+        validators = [
+            DurationValidator(),
+            FrequencyValidator(),
+            PleasantHabitValidator(),
+            RelatedHabitIsPleasantValidator(),
+            RelatedHabitRewardValidator(),
+        ]
+
+        for validator in validators:
+            validator(attrs)
+
+        if self.related_habit and self.related_habit.pk == self.pk:
+            raise ValidationError(
+                {"related_habit": _("Привычка не может быть связана сама с собой.")}
+            )
+
+    def save(self, *args, **kwargs):
+        """Переопределяем save для вызова clean()"""
+        self.full_clean()
+        super().save(*args, **kwargs)
