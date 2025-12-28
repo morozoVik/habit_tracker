@@ -13,3 +13,4 @@ flake8==7.3.0
 pytest==9.0.2
 pytest-django==4.11.1
 pytest-cov==7.0.0
+django-filter==25.2
