@@ -1,8 +1,13 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
+
+import requests
+import os
+from django.conf import settings
 
 from .models import User
 from .serializers import UserRegistrationSerializer, UserSerializer
@@ -50,3 +55,43 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class TelegramConnectView(APIView):
+    """Подключение Telegram аккаунта"""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        telegram_chat_id = request.data.get("telegram_chat_id")
+
+        if not telegram_chat_id:
+            return Response(
+                {"error": "Telegram chat ID is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        request.user.telegram_chat_id = telegram_chat_id
+        request.user.save()
+
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        if bot_token:
+            try:
+                url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                payload = {
+                    "chat_id": telegram_chat_id,
+                    "text": "Ваш аккаунт успешно подключен к Habit Tracker!",
+                    "parse_mode": "HTML",
+                }
+                response = requests.post(url, json=payload, timeout=10)
+                response.raise_for_status()
+            except Exception as e:
+                print(f"Failed to send welcome message: {e}")
+
+        return Response(
+            {
+                "success": True,
+                "message": "Telegram account connected successfully",
+                "telegram_chat_id": telegram_chat_id,
+            }
+        )
