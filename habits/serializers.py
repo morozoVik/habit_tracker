@@ -1,4 +1,5 @@
 from rest_framework import serializers
+
 from .models import Habit
 from .validators import (
     DurationValidator,

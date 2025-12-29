@@ -1,12 +1,11 @@
 import os
-from celery import shared_task
-from datetime import datetime, timedelta
+
 import requests
-
-from django.utils import timezone
+from celery import shared_task
 from django.contrib.auth import get_user_model
-from .models import Habit
+from django.utils import timezone
 
+from .models import Habit
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
@@ -63,7 +62,6 @@ def check_and_send_habit_notifications():
         print(f" Telegram ID: {habit.user.telegram_chat_id}")
         print(f" Время привычки: {habit.time}")
 
-        # Проверяем наличие Telegram chat_id
         if not habit.user.telegram_chat_id:
             print(f"️ Пропускаем: нет Telegram chat_id")
             continue
@@ -85,8 +83,8 @@ def check_and_send_habit_notifications():
         print(f" Задача отправки: {result.id}")
         notifications_sent += 1
 
-    print(f"\n" + "=" * 60)
-    print(f"ИТОГИ ПРОВЕРКИ:")
+    print(f" \n" + "=" * 60)
+    print(f" ИТОГИ ПРОВЕРКИ:")
     print(f" Проверено привычек: {total_habits}")
     print(f" Отправлено уведомлений: {notifications_sent}")
     print("=" * 60)

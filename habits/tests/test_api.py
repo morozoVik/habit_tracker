@@ -1,9 +1,11 @@
-import pytest
-from rest_framework.test import APIClient
-from rest_framework import status
-from django.contrib.auth import get_user_model
-from habits.models import Habit
 from datetime import time
+
+import pytest
+from django.contrib.auth import get_user_model
+from rest_framework import status
+from rest_framework.test import APIClient
+
+from habits.models import Habit
 
 User = get_user_model()
 

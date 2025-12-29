@@ -1,7 +1,8 @@
-import pytest
-from unittest.mock import patch, MagicMock
-from habits.tasks import send_telegram_notification
+from unittest.mock import MagicMock, patch
+
 import requests
+
+from habits.tasks import send_telegram_notification
 
 
 def test_send_telegram_notification_success():
