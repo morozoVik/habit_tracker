@@ -1,0 +1,4 @@
+[flake8]
+
+exclude = .venv,venv,env,.tox,*.egg,build,dist,migrations
+max-line-length = 100
