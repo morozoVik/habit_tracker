@@ -2,14 +2,9 @@ name: Deploy Habit Tracker
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ develop, main ]
   pull_request:
-    branches: [ main, master ]
-
-env:
-  SERVER_HOST: ${{ secrets.SERVER_HOST }}
-  SSH_USER: ${{ secrets.SSH_USER }}
-  DEPLOY_DIR: ${{ secrets.DEPLOY_DIR }}
+    branches: [ develop, main ]
 
 jobs:
   test:
@@ -68,23 +63,8 @@ jobs:
         python manage.py migrate
         pytest -v --ds=config.settings
 
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-
-    - name: Build Docker image
-      run: |
-        docker build -t habit-tracker:${{ github.sha }} .
-
   deploy:
-    needs: build
+    needs: test
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
 
@@ -104,18 +84,17 @@ jobs:
         chmod 600 ~/.ssh/known_hosts
 
     - name: Deploy to server
-      env:
-        SERVER_HOST: ${{ secrets.SERVER_HOST }}
-        SSH_USER: ${{ secrets.SSH_USER }}
-        DEPLOY_DIR: ${{ secrets.DEPLOY_DIR }}
       run: |
-        scp -r docker-compose.prod.yml .github .env.example Dockerfile requirements.txt $SSH_USER@$SERVER_HOST:$DEPLOY_DIR/
+        # Копируем файлы на сервер
+        scp -r docker-compose.prod.yml .github .env.example Dockerfile requirements.txt ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_DIR }}/
         
-        scp -r config habits users manage.py $SSH_USER@$SERVER_HOST:$DEPLOY_DIR/
+        # Копируем папки с кодом
+        scp -r config habits users manage.py ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_DIR }}/
         
-        ssh -o StrictHostKeyChecking=no $SSH_USER@$SERVER_HOST "
+        # Выполняем деплой
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }} "
           set -e
-          cd $DEPLOY_DIR
+          cd ${{ secrets.DEPLOY_DIR }}
           
           echo '=== Проверка Docker ==='
           docker --version
@@ -138,29 +117,24 @@ jobs:
           sleep 15
           
           echo '=== Выполнение миграций ==='
-          docker compose -f docker-compose.prod.yml exec -T django python manage.py migrate --noinput
+          docker compose -f docker-compose.prod.yml exec django python manage.py migrate --noinput
           
           echo '=== Сборка статики ==='
-          docker compose -f docker-compose.prod.yml exec -T django python manage.py collectstatic --noinput
+          docker compose -f docker-compose.prod.yml exec django python manage.py collectstatic --noinput
           
           echo '=== Создание суперпользователя (если нет) ==='
-          docker compose -f docker-compose.prod.yml exec -T django python manage.py shell -c "
-from django.contrib.auth import get_user_model
-User = get_user_model()
-if not User.objects.filter(username='admin').exists():
-    User.objects.create_superuser('admin', 'admin@example.com', 'admin123')
-    print('Superuser created')
-else:
-    print('Superuser already exists')
-"
+          docker compose -f docker-compose.prod.yml exec django python manage.py shell -c \"
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            if not User.objects.filter(username='admin').exists():
+                User.objects.create_superuser('admin', 'admin@example.com', 'admin123')
+                print('Superuser created')
+            else:
+                print('Superuser already exists')
+          \"
           
           echo '=== Проверка статуса контейнеров ==='
           docker compose -f docker-compose.prod.yml ps
           
           echo '=== Деплой успешно завершен! ==='
         "
-
-    - name: Health Check
-      run: |
-        sleep 30
-        curl -f http://${{ secrets.SERVER_HOST }}:8000/ || echo "Health check failed but deployment completed"
