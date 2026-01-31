@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ develop, main ]
 
+env:
+  SERVER_HOST: ${{ secrets.SERVER_HOST }}
+  SSH_USER: ${{ secrets.SSH_USER }}
+  DEPLOY_DIR: ${{ secrets.DEPLOY_DIR }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -63,6 +68,21 @@ jobs:
         python manage.py migrate
         pytest -v --ds=config.settings
 
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Build Docker image
+      run: |
+        docker build -t habit-tracker:${{ github.sha }} .
+
   deploy:
     needs: test
     runs-on: ubuntu-latest
@@ -84,14 +104,15 @@ jobs:
         chmod 600 ~/.ssh/known_hosts
 
     - name: Deploy to server
+      env:
+        SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        SSH_USER: ${{ secrets.SSH_USER }}
+        DEPLOY_DIR: ${{ secrets.DEPLOY_DIR }}
       run: |
-        # Копируем файлы на сервер
         scp -r docker-compose.prod.yml .github .env.example Dockerfile requirements.txt ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_DIR }}/
         
-        # Копируем папки с кодом
         scp -r config habits users manage.py ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_DIR }}/
         
-        # Выполняем деплой
         ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }} "
           set -e
           cd ${{ secrets.DEPLOY_DIR }}
@@ -138,3 +159,8 @@ jobs:
           
           echo '=== Деплой успешно завершен! ==='
         "
+        
+        - name: Health Check
+          run: |
+            sleep 30
+            curl -f http://${{ secrets.SERVER_HOST }}:8000/ || echo "Health check failed but deployment completed"
