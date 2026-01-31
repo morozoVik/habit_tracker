@@ -29,8 +29,6 @@ services:
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
              gunicorn --bind 0.0.0.0:8000 --workers 3 config.wsgi:application"
-    volumes:
-      - static_volume:/app/static
     ports:
       - "8000:8000"
     environment:
@@ -106,6 +104,4 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
-    driver: local
-  static_volume:
     driver: local
