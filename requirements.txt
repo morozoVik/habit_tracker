@@ -17,3 +17,4 @@ django-filter==25.2
 pytest==9.0.2
 pytest-cov==7.0.0
 pytest-django==4.11.1
+gunicorn==21.2.0
