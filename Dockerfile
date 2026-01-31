@@ -18,7 +18,9 @@ RUN python manage.py collectstatic --noinput
 
 RUN useradd -m -u 1000 django && \
     mkdir -p /app/static && \
-    chown -R django:django /appUSER django
+    chown -R django:django /app
+
+USER django
 
 EXPOSE 8000
 
