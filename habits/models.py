@@ -47,13 +47,10 @@ class Habit(models.Model):
 
     def clean(self):
         """Валидация данных модели"""
-        from .validators import (
-            DurationValidator,
-            FrequencyValidator,
-            PleasantHabitValidator,
-            RelatedHabitIsPleasantValidator,
-            RelatedHabitRewardValidator,
-        )
+        from .validators import (DurationValidator, FrequencyValidator,
+                                 PleasantHabitValidator,
+                                 RelatedHabitIsPleasantValidator,
+                                 RelatedHabitRewardValidator)
 
         attrs = {
             "duration": self.duration,
